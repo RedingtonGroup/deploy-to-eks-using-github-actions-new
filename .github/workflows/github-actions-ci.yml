@@ -1,4 +1,5 @@
-name: Node js app deploy to EKS private cluster
+name: Node.js app deploy to EKS private cluster
+
 on:
   push:
     branches: [ "main" ]
@@ -6,28 +7,33 @@ on:
     branches: [ "main" ]
 
 jobs:
-  deploy:
-    runs-on: self-hosted  #ubuntu-latest 
-    # permissions:
-    #   id-token: write
-    #   contents: read
+  sonarqube:
+    runs-on: self-hosted
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
 
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '14'
+
+    - name: SonarQube Scan
+      run: |
+        npm install -g sonarqube-scanner
+        sonar-scanner \
+          -Dsonar.host.url=http://13.200.137.62:9000/ \
+          -Dsonar.login=e7ede98e13cd10ef87960f0c5f0a827ab7c3efba \
+          -Dsonar.projectKey=test \
+          -Dsonar.projectName=test \
+          -Dsonar.sources=.
+
     - name: Install kubectl
       uses: azure/setup-kubectl@v2.0
       with:
-        version: 'v1.24.0' # default is the latest stable
-      id: install
+        version: 'v1.24.0'
 
-    # - name: Configure AWS Credentials
-    #   uses: aws-actions/configure-aws-credentials@v1
-    #   with:
-    #     role-to-assume: arn:aws:iam::737185589565:role/github_actions_roles
-    #     aws-region: ap-south-1
-
-    - name: Login to Amazon ECR,Build, tag, and push docker image to Amazon ECR
+    - name: Login to Amazon ECR, Build, tag, and push docker image to Amazon ECR
       id: login-ecr
       run: |
         aws ecr get-login-password --region ap-south-1 | sudo docker login --username AWS --password-stdin 737185589565.dkr.ecr.ap-south-1.amazonaws.com
