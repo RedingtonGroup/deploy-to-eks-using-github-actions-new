@@ -1,51 +1,40 @@
-name: Node.js app deploy to EKS private cluster
+name: Go SonarQube
 
 on:
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+    branches:
+      - main
 
 jobs:
   sonarqube:
     runs-on: ubuntu-latest
+
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v2
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v3
+    - name: Set up Go
+      uses: actions/setup-go@v2
       with:
-        node-version: '14'
+        go-version: 1.17
 
-    - name: SonarQube Scan
+    - name: Install SonarQube Scanner
       run: |
-        npm install -g sonarqube-scanner
+        curl -o sonar-scanner-cli.zip -L https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-4.6.2.2472-linux.zip
+        unzip sonar-scanner-cli.zip
+        export PATH=$PATH:$(pwd)/sonar-scanner-4.6.2.2472-linux/bin
+        rm sonar-scanner-cli.zip
+
+    - name: Build and run tests
+      run: |
+        go build -v
+        go test -v ./...
+
+    - name: SonarQube analysis
+      run: |
         sonar-scanner \
-          -Dsonar.host.url=http://13.200.137.62:9000/ \
-          -Dsonar.login=e7ede98e13cd10ef87960f0c5f0a827ab7c3efba \
-          -Dsonar.projectKey=test \
-          -Dsonar.projectName=test \
+          -Dsonar.host.url=http://your-sonarqube-instance:9000/ \
+          -Dsonar.login=your-sonarqube-token \
+          -Dsonar.projectKey=your-project-key \
+          -Dsonar.projectName=your-project-name \
           -Dsonar.sources=.
-
-    - name: Install kubectl
-      uses: azure/setup-kubectl@v2.0
-      with:
-        version: 'v1.24.0'
-
-    - name: Login to Amazon ECR, Build, tag, and push docker image to Amazon ECR
-      id: login-ecr
-      run: |
-        aws ecr get-login-password --region ap-south-1 | sudo docker login --username AWS --password-stdin 737185589565.dkr.ecr.ap-south-1.amazonaws.com
-        sudo docker build -t testpoc .
-        sudo docker tag testpoc:latest 737185589565.dkr.ecr.ap-south-1.amazonaws.com/testpoc:latest-4
-        sudo docker push 737185589565.dkr.ecr.ap-south-1.amazonaws.com/testpoc:latest-4
-
-    - name: Update kube config
-      run: aws eks update-kubeconfig --name Testpoc
-    
-    - name: Deploy to EKS
-      run: |
-        kubectl apply -f deployment.yaml
-        kubectl apply -f service.yaml
-        kubectl apply -f ingress.yaml
